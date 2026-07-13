@@ -65,10 +65,50 @@ class MagicNavProofTest : BasePlatformTestCase() {
         }
     """.trimIndent()
 
-    private val allMethods = setOf(MagicMethod.TO_STRING, MagicMethod.INVOKE)
+    /**
+     * Member-access magic. `Magic` declares real, *public* members (unambiguously accessible, so the
+     * negative cases can't be confused with a visibility-triggered magic call) alongside all four
+     * member magic methods; `NoMagic` declares none, to prove an undeclared access with no magic
+     * method is not a site.
+     */
+    private val memberFixture = """
+        <?php
+        class Magic {
+            public int ${'$'}realProp = 1;
+            public function realMethod(): int { return 1; }
+            public static function realStatic(): int { return 1; }
+            public function __get(${'$'}name) { return 1; }
+            public function __set(${'$'}name, ${'$'}value) {}
+            public function __call(${'$'}name, ${'$'}args) { return 1; }
+            public static function __callStatic(${'$'}name, ${'$'}args) { return 1; }
+        }
+        class NoMagic {
+            public int ${'$'}realProp = 1;
+            public function realMethod(): int { return 1; }
+        }
+
+        ${'$'}o = new Magic();
+        ${'$'}a = ${'$'}o->missing;          // (1) __get: undeclared property read
+        ${'$'}o->missing = 5;               // (2) __set: undeclared property write
+        ${'$'}b = ${'$'}o->realProp;         // (3) real property read → NO magic
+        ${'$'}o->realProp = 9;              // (4) real property write → NO magic
+        ${'$'}r = ${'$'}o->doThing();        // (5) __call: undeclared method
+        ${'$'}s = ${'$'}o->realMethod();     // (6) real method → NO magic
+        ${'$'}t = Magic::doStatic();        // (7) __callStatic: undeclared static method
+        ${'$'}u = Magic::realStatic();      // (8) real static method → NO magic
+
+        ${'$'}n = new NoMagic();
+        ${'$'}x = ${'$'}n->undeclared;       // (9) undeclared but no __get on class → NO site
+        ${'$'}y = ${'$'}n->realProp;         // (10) real property → NO site
+    """.trimIndent()
+
+    private val allMethods = MagicMethod.entries.toSet()
 
     private fun configure(): PhpFile =
         myFixture.configureByText("proof.php", fixture) as PhpFile
+
+    private fun configureMember(): PhpFile =
+        myFixture.configureByText("member.php", memberFixture) as PhpFile
 
     /** All resolved magic sites in the file, keyed by the trimmed text of the enclosing statement. */
     private fun sitesByStatement(file: PhpFile): Map<String, List<MagicSite>> {
@@ -203,5 +243,107 @@ class MagicNavProofTest : BasePlatformTestCase() {
         val nothing = PsiTreeUtil.collectElementsOfType(file, PsiElement::class.java)
             .flatMap { MagicSites.sitesFor(it, emptySet()) }
         assertTrue("master switch off must suppress everything", nothing.isEmpty())
+    }
+
+    // ---- Member-access magic: __get / __set / __call / __callStatic ----------------------------
+
+    fun testMemberMagicPositiveAndNegative() {
+        val file = configureMember()
+        val byStmt = sitesByStatement(file)
+
+        fun assertTarget(stmt: String, magic: MagicMethod, expected: String) {
+            val sites = byStmt[stmt].orEmpty().filter { it.magic == magic }
+            assertTrue("expected a $magic site for `$stmt` (have ${byStmt[stmt]})", sites.isNotEmpty())
+            assertEquals(
+                "targets for `$stmt`",
+                setOf(expected), sites.flatMap { it.labels() }.toSet(),
+            )
+        }
+
+        fun assertNoSite(stmt: String) {
+            assertTrue(
+                "`$stmt` must produce no magic site, had ${byStmt[stmt]}",
+                byStmt[stmt].isNullOrEmpty(),
+            )
+        }
+
+        // Positive: the magic method genuinely fires (member does not resolve).
+        assertTarget("\$a = \$o->missing;", MagicMethod.GET, "\\Magic::__get")
+        assertTarget("\$o->missing = 5;", MagicMethod.SET, "\\Magic::__set")
+        assertTarget("\$r = \$o->doThing();", MagicMethod.CALL, "\\Magic::__call")
+        assertTarget("\$t = Magic::doStatic();", MagicMethod.CALL_STATIC, "\\Magic::__callStatic")
+
+        // Negative: a real, accessible declared member resolves → the magic method never fires.
+        assertNoSite("\$b = \$o->realProp;")
+        assertNoSite("\$o->realProp = 9;")
+        assertNoSite("\$s = \$o->realMethod();")
+        assertNoSite("\$u = Magic::realStatic();")
+
+        // Negative: undeclared access on a class that declares no matching magic method → no site.
+        assertNoSite("\$x = \$n->undeclared;")
+        assertNoSite("\$y = \$n->realProp;")
+    }
+
+    fun testMemberMagicSettingsGating() {
+        val file = configureMember()
+        // Only __get enabled → the write/call/callStatic member sites are suppressed.
+        val getOnly = setOf(MagicMethod.GET)
+        val magics = PsiTreeUtil.collectElementsOfType(file, PsiElement::class.java)
+            .flatMap { MagicSites.sitesFor(it, getOnly) }
+            .map { it.magic }
+            .toSet()
+        assertEquals("only __get sites when only __get is enabled", setOf(MagicMethod.GET), magics)
+    }
+
+    fun testGotoDeclarationOffersGet() {
+        configureMember()
+        val handler = MagicNavGotoDeclarationHandler()
+        val offset = memberFixture.indexOf("\$o->missing;") + "\$o->".length + 1 // inside `missing`
+        val leaf = myFixture.file.findElementAt(offset)!!
+        val targets = handler.getGotoDeclarationTargets(leaf, offset, myFixture.editor)
+        assertNotNull("goto should offer __get on an undeclared property read", targets)
+        val labels = targets!!.filterIsInstance<com.jetbrains.php.lang.psi.elements.Method>()
+            .map { MagicMethodResolver.label(it) }
+        assertTrue("expected Magic::__get among goto targets, got $labels",
+            labels.contains("\\Magic::__get"))
+    }
+
+    // ---- Reverse Find Usages: implicit sites surface from the magic declaration -----------------
+
+    /** Run the custom usage searcher for [magicMethodName] on class [className] and return the
+     *  text of every implicit-usage element it reports. */
+    private fun reverseUsageTexts(className: String, magicMethodName: String): List<String> {
+        val method = PsiTreeUtil
+            .findChildrenOfType(myFixture.file, com.jetbrains.php.lang.psi.elements.Method::class.java)
+            .first { it.name == magicMethodName && it.containingClass?.name == className }
+        val usages = mutableListOf<com.intellij.usages.Usage>()
+        val processor = com.intellij.util.Processor<com.intellij.usages.Usage> { usages.add(it); true }
+        val options = com.intellij.find.findUsages.FindUsagesOptions(
+            com.intellij.psi.search.GlobalSearchScope.allScope(project),
+        )
+        MagicNavUsageSearcher().processElementUsages(method, processor, options)
+        return usages.mapNotNull { (it as? com.intellij.usages.UsageInfo2UsageAdapter)?.element?.text }
+    }
+
+    fun testReverseFindUsagesToString() {
+        configure()
+        val texts = reverseUsageTexts("Money", "__toString")
+        // Every implicit __toString site that dispatches to Money::__toString must be surfaced.
+        assertTrue("reverse usages should include the (string) cast operand, got $texts",
+            texts.any { it.contains("\$m") })
+        // The Coin/Stringable/Adder sites must NOT be attributed to Money::__toString.
+        assertTrue("reverse usages must not surface the __invoke callee, got $texts",
+            texts.none { it.contains("\$add") })
+        assertFalse("expected at least one reverse usage for Money::__toString", texts.isEmpty())
+    }
+
+    fun testReverseFindUsagesGet() {
+        configureMember()
+        val texts = reverseUsageTexts("Magic", "__get")
+        assertTrue("reverse usages of __get should surface the \$o->missing read, got $texts",
+            texts.any { it.contains("missing") })
+        // The write site is __set, not __get → must not appear here.
+        assertTrue("the property write must not be attributed to __get, got $texts",
+            texts.none { it.contains("doThing") })
     }
 }
