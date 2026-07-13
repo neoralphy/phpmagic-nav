@@ -7,25 +7,40 @@
         <p><b>Navigate PHP's invisible magic-method calls.</b></p>
         <p>PHP invokes some methods <i>implicitly</i>: a <code>(string)</code> cast or an
         <code>echo</code> secretly calls <code>__toString()</code>; <code>$callable(...)</code>
-        secretly calls <code>__invoke()</code>. None of these mention the method by name, so the IDE
-        offers no jump to the code that actually runs. This plugin adds it.</p>
+        secretly calls <code>__invoke()</code>; <code>$obj->prop</code> / <code>$obj->method()</code>
+        fall through to <code>__get()</code>/<code>__set()</code>/<code>__call()</code> when the
+        member isn't really declared. None of these mention the method by name, so the IDE offers no
+        jump to the code that actually runs. This plugin adds it.</p>
         <ul>
             <li>A <b>gutter icon</b> at every implicit site — a <code>(string)</code> cast, an
                 <code>echo</code>/<code>print</code>, string interpolation (<code>"$obj"</code>),
-                concatenation (<code>"x" . $obj</code>), and dynamic invokes
-                (<code>$callable(...)</code>) — jumping to the target method. Union types that can
-                dispatch to several implementations open a multi-target popup.</li>
+                concatenation (<code>"x" . $obj</code>), dynamic invokes (<code>$callable(...)</code>),
+                and member access that resolves to no real member: <code>$obj->prop</code> →
+                <code>__get()</code>, <code>$obj->prop = …</code> → <code>__set()</code>,
+                <code>$obj->m(...)</code> → <code>__call()</code>, <code>Foo::m(...)</code> →
+                <code>__callStatic()</code>. Union types open a multi-target popup.</li>
             <li><b>Go to Declaration</b> (Ctrl+Click / Ctrl+B) on the operand also offers the magic
                 method, alongside the normal jump.</li>
-            <li>Correctly handles the <code>\Stringable</code> interface, nullable/union types (only
-                the members that are actually callable are offered), and de-duplicates so nested and
-                multi-argument sites never double-mark.</li>
+            <li><b>Reverse Find Usages</b>: running Find Usages on a magic method (e.g.
+                <code>__toString</code>) also lists the implicit sites that trigger it.</li>
+            <li>Only marks member access when the magic method genuinely fires — a reference that
+                resolves to a real declared property/const/method is left alone. Correctly handles the
+                <code>\Stringable</code> interface, nullable/union types (only members that actually
+                declare the method are offered), and de-duplicates so nested and multi-argument sites
+                never double-mark.</li>
         </ul>
         <p>Configurable under <b>Settings | Tools | PHP Magic Nav</b>.</p>
     ]]></description>
 
     <change-notes><![CDATA[
         <ul>
+            <li><b>0.2.0</b> — Member-access magic: gutter markers + Go to Declaration for
+                <code>__get()</code>/<code>__set()</code> on undeclared <code>$obj->prop</code>
+                read/write, and <code>__call()</code>/<code>__callStatic()</code> on undeclared
+                <code>$obj->m(...)</code>/<code>Foo::m(...)</code> calls — only when the member does
+                not resolve to a real declaration. Added <b>reverse Find Usages</b>: Find Usages on a
+                magic method lists its implicit invocation sites. Per-method settings toggles for all
+                six magic methods plus reverse Find Usages.</li>
             <li><b>0.1.0</b> — First release. Forward navigation to <code>__toString()</code> from
                 casts, echo/print, interpolation and concatenation; navigation to
                 <code>__invoke()</code> from dynamic <code>$callable(...)</code> calls; gutter markers
@@ -44,6 +59,8 @@
             implementationClass="eu.neoralphy.phpmagicnav.MagicNavLineMarkerProvider"/>
         <codeInsight.gotoDeclarationHandler
             implementation="eu.neoralphy.phpmagicnav.MagicNavGotoDeclarationHandler"/>
+        <customUsageSearcher
+            implementation="eu.neoralphy.phpmagicnav.MagicNavUsageSearcher"/>
         <applicationConfigurable
             parentId="tools"
             instance="eu.neoralphy.phpmagicnav.MagicNavConfigurable"
