@@ -13,6 +13,7 @@ import com.jetbrains.php.lang.psi.elements.PhpEchoStatement
 import com.jetbrains.php.lang.psi.elements.PhpPrintExpression
 import com.jetbrains.php.lang.psi.elements.PhpReference
 import com.jetbrains.php.lang.psi.elements.PhpTypedElement
+import com.jetbrains.php.lang.psi.elements.SelfAssignmentExpression
 import com.jetbrains.php.lang.psi.elements.StringLiteralExpression
 import com.jetbrains.php.lang.psi.elements.UnaryExpression
 
@@ -41,6 +42,7 @@ object MagicSites {
      *  - interpolation      — [StringLiteralExpression]; operands = its embedded expressions (`"$m"`)
      *  - concatenation      — [BinaryExpression]/[com.jetbrains.php.lang.psi.elements.ConcatenationExpression];
      *                         operands = left & right (chained concat is nested, handled per node)
+     *  - concat-assign      — [SelfAssignmentExpression] `$s .= $obj` (`.=` only); operand = its RHS value
      *  - dynamic invoke     — [FunctionReference] whose callee is an expression (`$callable(...)`);
      *                         operand = the callee, magic = `__invoke`
      *  - property read      — [FieldReference] `$o->p` that doesn't resolve → `__get`; operand = the ref
@@ -90,6 +92,13 @@ object MagicSites {
                     element.leftOperand as? PhpTypedElement,
                     element.rightOperand as? PhpTypedElement,
                 )
+
+            // `$s .= $obj` desugars to `$s = $s . $obj`, so the right-hand value is coerced to string
+            // exactly like a plain concat — the same string context, just an assignment node instead
+            // of a BinaryExpression. Only the RHS is a *new* operand entering string context (the LHS
+            // is the already-string accumulator). Gate strictly on `.=` so `$n += $x` isn't caught.
+            element is SelfAssignmentExpression && isConcatAssign(element) ->
+                listOfNotNull(element.value as? PhpTypedElement)
 
             // Only *interpolated* (double-quoted / heredoc) strings have embedded PSI children;
             // a plain literal has none, so this yields an empty list for `'x'` / `"x"`.
@@ -211,4 +220,7 @@ object MagicSites {
 
     private fun isConcatenation(binary: BinaryExpression): Boolean =
         binary.operation?.node?.elementType == PhpTokenTypes.opCONCAT
+
+    private fun isConcatAssign(assign: SelfAssignmentExpression): Boolean =
+        assign.operationType == PhpTokenTypes.opCONCAT_ASGN
 }
