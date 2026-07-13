@@ -3,13 +3,21 @@
 A PhpStorm plugin that navigates PHP's **implicit magic-method calls** — the ones the language runs
 for you but never spells out, so the IDE offers no jump to the code that actually executes.
 
-| You wrote…                     | PHP secretly calls | This plugin jumps you to |
-|--------------------------------|--------------------|--------------------------|
-| `(string) $money`              | `__toString()`     | `Money::__toString`      |
-| `echo $money;` / `print $money;` | `__toString()`   | `Money::__toString`      |
-| `"balance: $money"`            | `__toString()`     | `Money::__toString`      |
-| `"a" . $money . "b"`           | `__toString()`     | `Money::__toString`      |
-| `$callable(1, 2)`              | `__invoke()`       | `Adder::__invoke`        |
+| You wrote…                       | PHP secretly calls | This plugin jumps you to |
+|----------------------------------|--------------------|--------------------------|
+| `(string) $money`                | `__toString()`     | `Money::__toString`      |
+| `echo $money;` / `print $money;` | `__toString()`     | `Money::__toString`      |
+| `"balance: $money"`              | `__toString()`     | `Money::__toString`      |
+| `"a" . $money . "b"`             | `__toString()`     | `Money::__toString`      |
+| `$callable(1, 2)`                | `__invoke()`       | `Adder::__invoke`        |
+| `$obj->undeclaredProp` (read)    | `__get()`          | `Obj::__get`             |
+| `$obj->undeclaredProp = …`       | `__set()`          | `Obj::__set`             |
+| `$obj->undeclaredMethod(…)`      | `__call()`         | `Obj::__call`            |
+| `Foo::undeclaredStatic(…)`       | `__callStatic()`   | `Foo::__callStatic`      |
+
+The last four fire **only** when the member is not really there. `$obj->realProp` /
+`$obj->realMethod()` resolve to a genuine declaration, so PHP never calls the magic method and the
+plugin leaves them alone.
 
 ## Features
 
@@ -17,30 +25,58 @@ for you but never spells out, so the IDE offers no jump to the code that actuall
   (`Money|Coin`) that can dispatch to several implementations opens a multi-target popup.
 - **Go to Declaration** (Ctrl+Click / Ctrl+B) on the operand also offers the magic method,
   *alongside* the normal jump — you never lose the usual navigation.
+- **Reverse Find Usages**: run *Find Usages* on a magic method (e.g. `__toString`, `__get`, `__call`)
+  and the result list includes the implicit sites — the `(string)` casts, `$obj->prop` accesses and
+  unresolved calls — that trigger it, which PhpStorm's own Find Usages never shows.
 - Understands the `\Stringable` interface (a value typed as the interface targets the interface's
   own `__toString` declaration) and nullable/union types (only the members that actually declare
   the method are offered).
 - **De-duplicates**: nested casts and multi-argument / concat-inside-echo sites mark the operand
   once, not twice.
 - **Settings** under *Settings | Tools | PHP Magic Nav*: a master switch plus per-method toggles
-  for `__toString` and `__invoke`.
+  for `__toString`, `__invoke`, `__get`, `__set`, `__call`, `__callStatic`, and reverse Find Usages.
+
+## "Is the member real?" — heuristic boundaries
+
+The member-access markers (`__get`/`__set`/`__call`/`__callStatic`) fire only when the reference does
+**not** resolve to a real declared member. That decision uses PhpStorm's own resolution
+(`multiResolve`), which has two deliberate boundaries worth knowing:
+
+- **Visibility is not modelled.** PhpStorm resolves by *declaration*, not by call-site
+  accessibility. A `private`/`protected` member reached from an outside scope still resolves, so a
+  magic call triggered purely by *inaccessibility* (PHP does invoke `__get`/`__call` there) is **not**
+  marked. This is intentional — we would rather miss that rarer case than falsely mark legitimate
+  member access.
+- **`@property` / `@method` phpdoc counts as declared.** A member documented in phpdoc resolves to
+  that phpdoc declaration and is treated as real (not marked), because the IDE already navigates it
+  natively.
+
+Reverse Find Usages is bounded the same way it must be: an implicit site is only detectable in a file
+where the value's type is inferable, which requires the class to be named in that file. The searcher
+therefore scans only files that mention the class's short name (via the identifier index), then reuses
+the exact same `MagicSites` logic — so a site marked forward is exactly a site found in reverse.
 
 ## How it works
 
 Detection and resolution live in one place (`MagicSites`), so the gutter markers and the Goto
 handler can never disagree about what is a site.
 
-- `MagicMethods.kt` — the `MagicMethod` enum (`__toString`, `__invoke`) and `MagicMethodResolver`,
-  which takes an operand's `PhpType`, completes it with `global()` (expanding unions / inferred
-  signatures), and resolves each FQN through the `PhpIndex` as a class *or* interface to collect the
-  magic method.
-- `MagicSites.kt` — maps each recognised container node to its operand(s): `(string)` cast →
-  `UnaryExpression`, `echo` → `PhpEchoStatement`, `print` → `PhpPrintExpression`, interpolation →
+- `MagicMethods.kt` — the `MagicMethod` enum (`__toString`, `__invoke`, `__get`, `__set`, `__call`,
+  `__callStatic`) and `MagicMethodResolver`, which takes an operand's `PhpType`, completes it with
+  `global()` (expanding unions / inferred signatures), and resolves each FQN through the `PhpIndex` as
+  a class *or* interface to collect the magic method.
+- `MagicSites.kt` — maps each recognised node to its operand(s): `(string)` cast → `UnaryExpression`,
+  `echo` → `PhpEchoStatement`, `print` → `PhpPrintExpression`, interpolation →
   `StringLiteralExpression`'s embedded expressions, concatenation → `ConcatenationExpression`'s
-  operands, dynamic invoke → a `FunctionReference` whose callee is an expression.
+  operands, dynamic invoke → a `FunctionReference` whose callee is an expression, property access →
+  `FieldReference` (`__get`/`__set`, split by `RWAccess`), and method call → `MethodReference`
+  (`__call`/`__callStatic`, split by `isStatic`). The member cases first check that the reference does
+  *not* resolve to a real declared member before touching the (expensive) type resolution.
 - `MagicNavLineMarkerProvider.kt` — a `RelatedItemLineMarkerProvider`; overrides the *batch* hook to
   dedup by anchor leaf.
 - `MagicNavGotoDeclarationHandler.kt` — adds magic targets when the caret sits on an operand.
+- `MagicNavUsageSearcher.kt` — a `CustomUsageSearcher` that powers reverse Find Usages, reusing
+  `MagicSites` over the files that mention the magic method's class.
 
 ### Performance
 
@@ -80,12 +116,14 @@ A gutter icon appears on each line; click it (or Ctrl+B on `$m`) to jump to `__t
 
 ## Scope
 
-Covered: forward navigation to `__toString()` from casts, `echo`/`print`, interpolation and
-concatenation; navigation to `__invoke()` from dynamic `$callable(...)` calls.
+Covered: forward navigation to `__toString()` (casts, `echo`/`print`, interpolation, concatenation),
+`__invoke()` (dynamic `$callable(...)`), and `__get`/`__set`/`__call`/`__callStatic` (member access
+that resolves to no real declaration); plus reverse Find Usages for all of them.
 
-Deliberately **not** in this version (kept out to ship everything verified):
-- `__get` / `__set` / `__call` usage → magic-method markers.
-- Reverse navigation (Find Usages of `__toString` surfacing the implicit sites).
+Known limitations (see *heuristic boundaries* above): visibility-only magic (a `private` member
+reached from outside) and `@property`/`@method`-documented members are treated as real and not marked;
+compound assignment (`$obj->prop += …` on a magic property) is marked as `__set` only, though PHP
+fires both `__get` and `__set`.
 
 ## License
 
