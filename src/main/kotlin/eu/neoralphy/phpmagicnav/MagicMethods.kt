@@ -4,6 +4,7 @@ import com.intellij.psi.PsiElement
 import com.jetbrains.php.PhpIndex
 import com.jetbrains.php.lang.psi.elements.Method
 import com.jetbrains.php.lang.psi.elements.PhpTypedElement
+import com.jetbrains.php.lang.psi.resolve.types.PhpType
 
 /**
  * The PHP "magic methods" this plugin can navigate to from their *implicit* invocation sites.
@@ -71,11 +72,13 @@ object MagicMethodResolver {
 
         val methods = LinkedHashSet<Method>()
         for (fqn in type.types) {
-            // Cheap primitive skip: PHP primitive type strings are lowercase (\string, \int, \bool,
-            // \array, …); class/interface FQNs are capitalized (\Money, \Stringable). Empty index
-            // results would filter them anyway, but this avoids the lookups on the common scalar path.
-            val bare = fqn.substringAfterLast('\\')
-            if (bare.isEmpty() || bare[0].isLowerCase()) continue
+            // Cheap primitive skip: PHP primitive/pseudo types (\string, \int, \bool, \array, null,
+            // mixed, callable, …) never declare a magic method, and skipping them keeps the common
+            // scalar path off the index. We ask the platform's own primitive check rather than a
+            // first-letter-case heuristic: a lowercase-*named* class (`class money {}` — legal,
+            // case-insensitive PHP) is NOT a primitive and must still be resolved. The old
+            // `fqn[0].isLowerCase()` shortcut silently dropped every such class (false negative).
+            if (fqn.isEmpty() || PhpType.isPrimitiveType(fqn)) continue
 
             val candidates = index.getClassesByFQN(fqn) + index.getInterfacesByFQN(fqn)
             for (klass in candidates) {
