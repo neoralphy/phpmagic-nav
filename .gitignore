@@ -1,0 +1,9 @@
+.gradle/
+build/
+out/
+*.iml
+.idea/
+.kotlin/
+.intellijPlatform/
+
+# Keep the Gradle wrapper jar tracked, ignore everything else transient.

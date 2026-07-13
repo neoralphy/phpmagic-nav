@@ -1,0 +1,20 @@
+#!/usr/bin/env bash
+# Wrapper around ./gradlew that points at the Homebrew JDK 17.
+#
+# The Homebrew openjdk@17 is keg-only and not on PATH, so a bare `./gradlew`
+# fails with "Unable to locate a Java Runtime". This wrapper exports JAVA_HOME
+# (overridable from the environment) and forwards all arguments to the wrapper.
+#
+# Usage: ./gw test | ./gw buildPlugin | ./gw runIde | ./gw verifyPlugin
+set -euo pipefail
+
+export JAVA_HOME="${JAVA_HOME:-/opt/homebrew/opt/openjdk@17}"
+
+if [ ! -x "$JAVA_HOME/bin/java" ]; then
+  echo "gw: no JDK at JAVA_HOME=$JAVA_HOME" >&2
+  echo "    install one with: brew install openjdk@17" >&2
+  exit 1
+fi
+
+dir="$(cd "$(dirname "$0")" && pwd)"
+exec "$dir/gradlew" "$@"
