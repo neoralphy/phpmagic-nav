@@ -21,6 +21,23 @@ enum class MagicMethod(
 ) {
     TO_STRING("__toString", "__toString()"),
     INVOKE("__invoke", "__invoke()"),
+
+    // Member-access magic. Unlike the two above (which fire on *every* string/callable use of the
+    // operand), these only fire when the named member does NOT resolve to a real declared one —
+    // `$o->prop` calls `__get` only when `prop` isn't a real property, `$o->m()` calls `__call` only
+    // when `m()` isn't a real method. That "member unresolved" gate lives in [MagicSites].
+    GET("__get", "__get()"),
+    SET("__set", "__set()"),
+    CALL("__call", "__call()"),
+    CALL_STATIC("__callStatic", "__callStatic()"),
+    ;
+
+    companion object {
+        /** Reverse lookup PHP method name → magic method, for Find Usages on a magic declaration. */
+        private val byMethodName: Map<String, MagicMethod> = entries.associateBy { it.methodName }
+
+        fun forMethodName(name: String?): MagicMethod? = name?.let { byMethodName[it] }
+    }
 }
 
 /**

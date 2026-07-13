@@ -37,6 +37,35 @@ class MagicNavConfigurable : BoundConfigurable("PHP Magic Nav") {
                     .bindSelected(settings::markInvoke)
                     .enabledIf(master.selected)
             }
+            row {
+                checkBox("__get()  — \$obj->prop read of an undeclared property")
+                    .bindSelected(settings::markGet)
+                    .enabledIf(master.selected)
+            }
+            row {
+                checkBox("__set()  — \$obj->prop = … write to an undeclared property")
+                    .bindSelected(settings::markSet)
+                    .enabledIf(master.selected)
+            }
+            row {
+                checkBox("__call()  — \$obj->method(...) call of an undeclared method")
+                    .bindSelected(settings::markCall)
+                    .enabledIf(master.selected)
+            }
+            row {
+                checkBox("__callStatic()  — Foo::method(...) call of an undeclared static method")
+                    .bindSelected(settings::markCallStatic)
+                    .enabledIf(master.selected)
+            }
+        }
+        row {
+            checkBox("Reverse Find Usages: show implicit sites when finding usages of a magic method")
+                .bindSelected(settings::reverseFindUsages)
+                .enabledIf(master.selected)
+            comment(
+                "Find Usages on a __toString/__get/__call etc. also lists the (string) casts, " +
+                    "property accesses and calls that implicitly trigger it.",
+            )
         }
     }
 
