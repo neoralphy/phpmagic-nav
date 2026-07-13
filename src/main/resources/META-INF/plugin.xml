@@ -1,0 +1,53 @@
+<idea-plugin>
+    <id>eu.neoralphy.phpmagicnav</id>
+    <name>PHP Magic Method Navigation</name>
+    <vendor email="pelyhearon@gmail.com" url="https://github.com/neoralphy">neoralphy</vendor>
+
+    <description><![CDATA[
+        <p><b>Navigate PHP's invisible magic-method calls.</b></p>
+        <p>PHP invokes some methods <i>implicitly</i>: a <code>(string)</code> cast or an
+        <code>echo</code> secretly calls <code>__toString()</code>; <code>$callable(...)</code>
+        secretly calls <code>__invoke()</code>. None of these mention the method by name, so the IDE
+        offers no jump to the code that actually runs. This plugin adds it.</p>
+        <ul>
+            <li>A <b>gutter icon</b> at every implicit site — a <code>(string)</code> cast, an
+                <code>echo</code>/<code>print</code>, string interpolation (<code>"$obj"</code>),
+                concatenation (<code>"x" . $obj</code>), and dynamic invokes
+                (<code>$callable(...)</code>) — jumping to the target method. Union types that can
+                dispatch to several implementations open a multi-target popup.</li>
+            <li><b>Go to Declaration</b> (Ctrl+Click / Ctrl+B) on the operand also offers the magic
+                method, alongside the normal jump.</li>
+            <li>Correctly handles the <code>\Stringable</code> interface, nullable/union types (only
+                the members that are actually callable are offered), and de-duplicates so nested and
+                multi-argument sites never double-mark.</li>
+        </ul>
+        <p>Configurable under <b>Settings | Tools | PHP Magic Nav</b>.</p>
+    ]]></description>
+
+    <change-notes><![CDATA[
+        <ul>
+            <li><b>0.1.0</b> — First release. Forward navigation to <code>__toString()</code> from
+                casts, echo/print, interpolation and concatenation; navigation to
+                <code>__invoke()</code> from dynamic <code>$callable(...)</code> calls; gutter markers
+                + Go to Declaration; multi-target unions; settings toggles.</li>
+        </ul>
+    ]]></change-notes>
+
+    <!-- Platform + PHP. PHP is REQUIRED (this plugin targets PhpStorm, which bundles
+         com.jetbrains.php); it has nothing to do in a non-PHP IDE, so the dependency is hard. -->
+    <depends>com.intellij.modules.platform</depends>
+    <depends>com.jetbrains.php</depends>
+
+    <extensions defaultExtensionNs="com.intellij">
+        <codeInsight.lineMarkerProvider
+            language="PHP"
+            implementationClass="eu.neoralphy.phpmagicnav.MagicNavLineMarkerProvider"/>
+        <codeInsight.gotoDeclarationHandler
+            implementation="eu.neoralphy.phpmagicnav.MagicNavGotoDeclarationHandler"/>
+        <applicationConfigurable
+            parentId="tools"
+            instance="eu.neoralphy.phpmagicnav.MagicNavConfigurable"
+            id="eu.neoralphy.phpmagicnav.settings"
+            displayName="PHP Magic Nav"/>
+    </extensions>
+</idea-plugin>
