@@ -34,6 +34,12 @@
 
     <change-notes><![CDATA[
         <ul>
+            <li><b>0.2.1</b> — A read-modify-write on an undeclared property
+                (<code>$obj->prop += …</code>, <code>$obj->prop++</code>) now offers <b>both</b>
+                <code>__get()</code> and <code>__set()</code> — PHP reads the old value then writes the
+                new one, so both fire. When two magic methods fire on the same operand (e.g.
+                <code>echo $obj->prop</code> where <code>__get</code> returns a <code>Stringable</code>),
+                the gutter marker now offers every jump instead of silently dropping one.</li>
             <li><b>0.2.0</b> — Member-access magic: gutter markers + Go to Declaration for
                 <code>__get()</code>/<code>__set()</code> on undeclared <code>$obj->prop</code>
                 read/write, and <code>__call()</code>/<code>__callStatic()</code> on undeclared

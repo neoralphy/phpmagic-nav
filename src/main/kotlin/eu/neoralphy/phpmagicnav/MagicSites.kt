@@ -46,7 +46,8 @@ object MagicSites {
      *  - dynamic invoke     — [FunctionReference] whose callee is an expression (`$callable(...)`);
      *                         operand = the callee, magic = `__invoke`
      *  - property read      — [FieldReference] `$o->p` that doesn't resolve → `__get`; operand = the ref
-     *  - property write     — [FieldReference] `$o->p = …` (write access) that doesn't resolve → `__set`
+     *  - property write     — [FieldReference] `$o->p = …` (write access) that doesn't resolve → `__set`;
+     *                         a read-modify-write (`$o->p += …`, `$o->p++`) resolves to BOTH `__get` and `__set`
      *  - method call        — [MethodReference] `$o->m()` / `Foo::m()` that doesn't resolve →
      *                         `__call` / `__callStatic`; operand = the whole call reference
      *
@@ -158,13 +159,46 @@ object MagicSites {
      */
     private fun fieldAccessSite(element: FieldReference, enabled: Set<MagicMethod>): List<MagicSite> {
         if (element.isStatic) return emptyList()
-        val magic = if (element.isWriteAccess) MagicMethod.SET else MagicMethod.GET
-        if (magic !in enabled) return emptyList()
+        // Which member-magic methods PHP fires on this access. A plain read fires `__get`; a plain
+        // write (`$o->p = …`) fires `__set`; but a *read-modify-write* (`$o->p += …`, `$o->p++`,
+        // `--$o->p`) fires BOTH — PHP reads the current value via `__get`, applies the operator, then
+        // writes the result via `__set`. The platform's RWAccess only exposes `isWriteAccess()` (no
+        // ReadWrite state), so the compound/inc-dec case is recognised from the parent PSI.
+        val magics: List<MagicMethod> = when {
+            !element.isWriteAccess -> listOf(MagicMethod.GET)
+            isReadModifyWrite(element) -> listOf(MagicMethod.GET, MagicMethod.SET)
+            else -> listOf(MagicMethod.SET)
+        }
+        // Cheap gates before the expensive receiver-type resolution: bail if none of the methods PHP
+        // would fire here are enabled, or the member resolves to a real declaration.
+        if (magics.none { it in enabled }) return emptyList()
         if (resolvesToRealMember(element)) return emptyList()
         val receiver = element.classReference ?: return emptyList()
-        val targets = MagicMethodResolver.resolveMagicTargets(receiver, magic)
-        return if (targets.isEmpty()) emptyList() else listOf(MagicSite(element, magic, targets))
+        val sites = ArrayList<MagicSite>(magics.size)
+        for (magic in magics) {
+            if (magic !in enabled) continue
+            val targets = MagicMethodResolver.resolveMagicTargets(receiver, magic)
+            if (targets.isNotEmpty()) sites.add(MagicSite(element, magic, targets))
+        }
+        return sites
     }
+
+    /**
+     * Is this write-access field reference part of a read-modify-write — a compound assignment
+     * (`+=`, `.=`, `??=`, …) or an increment/decrement (`$o->p++`, `--$o->p`)? Those read the current
+     * value (via `__get`) before writing the new one (via `__set`); a plain `$o->p = …` does not.
+     * Only ever called once [FieldReference.isWriteAccess] is already known true.
+     */
+    private fun isReadModifyWrite(element: FieldReference): Boolean =
+        when (val parent = element.parent) {
+            // `$o->p += …` etc. — guard that `element` is the assignment *target* (LHS `variable`),
+            // not some incidental value expression.
+            is SelfAssignmentExpression -> parent.variable === element
+            // `$o->p++` / `--$o->p`: the only unary operators that write to a field are `++`/`--`,
+            // and we only reach here when isWriteAccess() already confirmed a write.
+            is UnaryExpression -> true
+            else -> false
+        }
 
     /**
      * Does this member reference point at a *real declared* member — a property/const for a field

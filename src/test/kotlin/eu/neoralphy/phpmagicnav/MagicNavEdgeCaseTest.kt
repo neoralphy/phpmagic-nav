@@ -391,6 +391,153 @@ class MagicNavEdgeCaseTest : BasePlatformTestCase() {
         assertNoSite(byStmt, "\$y = \$this->hidden();")
     }
 
+    // ---- Read-modify-write on an undeclared property fires BOTH __get and __set ------------------
+
+    fun testReadModifyWriteFiresGetAndSet() {
+        val byStmt = sites(
+            """
+            <?php
+            class Bag {
+                public function __get(${'$'}n) { return 1; }
+                public function __set(${'$'}n, ${'$'}v) {}
+            }
+            ${'$'}b = new Bag();
+            ${'$'}r = ${'$'}b->plainRead;    // read only → __get
+            ${'$'}b->plainWrite = 5;        // plain write → __set only
+            ${'$'}b->compound += 5;         // read-modify-write → __get AND __set
+            ${'$'}b->concatAsg .= "x";      // .= read-modify-write → __get AND __set
+            ${'$'}b->post++;                // post-increment → __get AND __set
+            --${'$'}b->pre;                 // pre-decrement → __get AND __set
+            """.trimIndent(),
+        )
+
+        fun magics(stmt: String) =
+            byStmt[stmt].orEmpty().map { it.magic }.toSet()
+
+        assertEquals("plain read → __get only", setOf(MagicMethod.GET), magics("\$r = \$b->plainRead;"))
+        assertEquals("plain write → __set only", setOf(MagicMethod.SET), magics("\$b->plainWrite = 5;"))
+        assertEquals(
+            "`+=` reads then writes → both __get and __set",
+            setOf(MagicMethod.GET, MagicMethod.SET), magics("\$b->compound += 5;"),
+        )
+        assertEquals(
+            "`.=` reads then writes → both __get and __set",
+            setOf(MagicMethod.GET, MagicMethod.SET), magics("\$b->concatAsg .= \"x\";"),
+        )
+        assertEquals(
+            "post-increment reads then writes → both __get and __set",
+            setOf(MagicMethod.GET, MagicMethod.SET), magics("\$b->post++;"),
+        )
+        assertEquals(
+            "pre-decrement reads then writes → both __get and __set",
+            setOf(MagicMethod.GET, MagicMethod.SET), magics("--\$b->pre;"),
+        )
+        // The targets are still correctly resolved for both.
+        val compound = byStmt["\$b->compound += 5;"].orEmpty()
+        assertEquals(setOf("\\Bag::__get"), compound.filter { it.magic == MagicMethod.GET }.flatMap { it.labels() }.toSet())
+        assertEquals(setOf("\\Bag::__set"), compound.filter { it.magic == MagicMethod.SET }.flatMap { it.labels() }.toSet())
+    }
+
+    fun testReadModifyWriteOnRealPropertyStaysUnmarked() {
+        // A compound assignment to a genuinely declared property must NOT be magic — the member
+        // resolves, so neither __get nor __set fires.
+        val byStmt = sites(
+            """
+            <?php
+            class Counter {
+                public int ${'$'}n = 0;
+                public function __get(${'$'}k) { return 1; }
+                public function __set(${'$'}k, ${'$'}v) {}
+            }
+            ${'$'}c = new Counter();
+            ${'$'}c->n += 5;   // real property → no magic
+            ${'$'}c->n++;      // real property → no magic
+            """.trimIndent(),
+        )
+        assertNoSite(byStmt, "\$c->n += 5;")
+        assertNoSite(byStmt, "\$c->n++;")
+    }
+
+    fun testReadModifyWriteRespectsSettingsGate() {
+        // With only __set enabled, a `+=` site must surface just __set (not the __get half).
+        val file = myFixture.configureByText(
+            "edge.php",
+            """
+            <?php
+            class Bag {
+                public function __get(${'$'}n) { return 1; }
+                public function __set(${'$'}n, ${'$'}v) {}
+            }
+            ${'$'}b = new Bag();
+            ${'$'}b->x += 5;
+            """.trimIndent(),
+        ) as PhpFile
+        val setOnly = setOf(MagicMethod.SET)
+        val magics = PsiTreeUtil.collectElementsOfType(file, PsiElement::class.java)
+            .flatMap { MagicSites.sitesFor(it, setOnly) }
+            .map { it.magic }.toSet()
+        assertEquals("only __set when only __set enabled", setOf(MagicMethod.SET), magics)
+    }
+
+    // ---- Merge: distinct magic methods on the SAME operand leaf must not drop a jump ------------
+
+    /** Extract the magic-target labels a gutter marker actually navigates to. */
+    private fun com.intellij.codeInsight.daemon.RelatedItemLineMarkerInfo<*>.targetLabels(): Set<String> =
+        createGotoRelatedItems().mapNotNull { it.element as? Method }
+            .map { MagicMethodResolver.label(it) }.toSet()
+
+    fun testChainedGetReturningStringableKeepsBothTargets() {
+        // `echo $o->missing` where __get returns a Stringable is TWO magic events on one leaf:
+        // the __get property access and the __toString coercion of its return. The gutter must
+        // offer BOTH (one merged marker), not silently drop one.
+        val file = myFixture.configureByText(
+            "edge.php",
+            """
+            <?php
+            class Inner { public function __toString(): string { return "i"; } }
+            class Outer { public function __get(${'$'}n): Inner { return new Inner(); } }
+            ${'$'}o = new Outer();
+            echo ${'$'}o->missing;
+            """.trimIndent(),
+        ) as PhpFile
+        val provider = MagicNavLineMarkerProvider()
+        val elements = PsiTreeUtil.collectElementsOfType(file, PsiElement::class.java).toMutableList()
+        val result = mutableListOf<com.intellij.codeInsight.daemon.RelatedItemLineMarkerInfo<*>>()
+        provider.collectNavigationMarkers(elements, result, false)
+        // Exactly one marker on the shared leaf, but it must carry BOTH targets.
+        assertEquals("one merged marker at the shared operand leaf", 1, result.size)
+        assertEquals(
+            "the merged marker must offer both the __get and the __toString jump",
+            setOf("\\Outer::__get", "\\Inner::__toString"),
+            result.single().targetLabels(),
+        )
+    }
+
+    fun testReadModifyWriteMarkerOffersGetAndSet() {
+        val file = myFixture.configureByText(
+            "edge.php",
+            """
+            <?php
+            class Bag {
+                public function __get(${'$'}n) { return 1; }
+                public function __set(${'$'}n, ${'$'}v) {}
+            }
+            ${'$'}b = new Bag();
+            ${'$'}b->missing += 5;
+            """.trimIndent(),
+        ) as PhpFile
+        val provider = MagicNavLineMarkerProvider()
+        val elements = PsiTreeUtil.collectElementsOfType(file, PsiElement::class.java).toMutableList()
+        val result = mutableListOf<com.intellij.codeInsight.daemon.RelatedItemLineMarkerInfo<*>>()
+        provider.collectNavigationMarkers(elements, result, false)
+        assertEquals("one merged marker for the read-modify-write", 1, result.size)
+        assertEquals(
+            "read-modify-write marker offers both __get and __set",
+            setOf("\\Bag::__get", "\\Bag::__set"),
+            result.single().targetLabels(),
+        )
+    }
+
     // ---- Reverse Find Usages: empty result, no crash --------------------------------------------
 
     fun testReverseFindUsagesEmptyWhenNoImplicitSites() {

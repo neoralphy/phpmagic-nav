@@ -31,8 +31,12 @@ plugin leaves them alone.
 - Understands the `\Stringable` interface (a value typed as the interface targets the interface's
   own `__toString` declaration) and nullable/union types (only the members that actually declare
   the method are offered).
-- **De-duplicates**: nested casts and multi-argument / concat-inside-echo sites mark the operand
-  once, not twice.
+- **De-duplicates** without losing a jump: nested casts and multi-argument / concat-inside-echo sites
+  mark the operand once, not twice — but when two *different* magic methods genuinely fire on the same
+  operand (e.g. `echo $obj->prop` where `__get` returns a `Stringable`: both `__get` and `__toString`
+  run), the single marker offers both targets.
+- **Read-modify-write** on an undeclared property (`$obj->prop += …`, `$obj->prop++`) offers both
+  `__get` and `__set`, since PHP reads the old value then writes the new one.
 - **Settings** under *Settings | Tools | PHP Magic Nav*: a master switch plus per-method toggles
   for `__toString`, `__invoke`, `__get`, `__set`, `__call`, `__callStatic`, and reverse Find Usages.
 
@@ -73,7 +77,8 @@ handler can never disagree about what is a site.
   (`__call`/`__callStatic`, split by `isStatic`). The member cases first check that the reference does
   *not* resolve to a real declared member before touching the (expensive) type resolution.
 - `MagicNavLineMarkerProvider.kt` — a `RelatedItemLineMarkerProvider`; overrides the *batch* hook to
-  dedup by anchor leaf.
+  group sites by anchor leaf, merging the targets of every site on a leaf into one marker (so genuine
+  duplicates collapse but distinct magic methods on the same operand each stay reachable).
 - `MagicNavGotoDeclarationHandler.kt` — adds magic targets when the caret sits on an operand.
 - `MagicNavUsageSearcher.kt` — a `CustomUsageSearcher` that powers reverse Find Usages, reusing
   `MagicSites` over the files that mention the magic method's class.
@@ -121,9 +126,7 @@ Covered: forward navigation to `__toString()` (casts, `echo`/`print`, interpolat
 that resolves to no real declaration); plus reverse Find Usages for all of them.
 
 Known limitations (see *heuristic boundaries* above): visibility-only magic (a `private` member
-reached from outside) and `@property`/`@method`-documented members are treated as real and not marked;
-compound assignment (`$obj->prop += …` on a magic property) is marked as `__set` only, though PHP
-fires both `__get` and `__set`.
+reached from outside) and `@property`/`@method`-documented members are treated as real and not marked.
 
 ## License
 
