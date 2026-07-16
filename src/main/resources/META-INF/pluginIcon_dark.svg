@@ -1,0 +1,16 @@
+<!--
+  PHP Magic Method Navigation — Marketplace plugin icon (40px), dark-theme variant of
+  pluginIcon.svg: identical geometry, the structural gray lifted a step (#6E7681 -> #8B949E) so
+  the `__` bars read on dark backgrounds, and the blue nudged brighter (#3574F0 -> #548AF7) to
+  keep the jump/sparkle vivid against a dark listing card.
+-->
+<svg width="40" height="40" viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <!-- the jump: an arc springing off the magic site, arrowhead landing on the real method -->
+  <path d="M8 29 C 7 14, 24 9, 30 17" stroke="#548AF7" stroke-width="2.6" stroke-linecap="round"/>
+  <path d="M29.4 12 L 30 17 L 25.4 15" stroke="#548AF7" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/>
+  <!-- the "magic": a sparkle over the arc's apex -->
+  <path d="M22 4 L 22.7 6.3 L 25 7 L 22.7 7.7 L 22 10 L 21.3 7.7 L 19 7 L 21.3 6.3 Z" fill="#548AF7"/>
+  <!-- the `__` double-underscore motif: two rounded bars, the magic-method naming convention -->
+  <path d="M8 33 H 17" stroke="#8B949E" stroke-width="2.6" stroke-linecap="round"/>
+  <path d="M21 33 H 30" stroke="#8B949E" stroke-width="2.6" stroke-linecap="round"/>
+</svg>

@@ -1,0 +1,17 @@
+{
+    "name": "phpmagic-nav/example-magic",
+    "description": "A small realistic PHP project that exercises every navigable magic-method case in the PHP Magic Method Navigation plugin. Open this folder in PhpStorm with the plugin installed and follow README.md.",
+    "type": "project",
+    "license": "MIT",
+    "require": {
+        "php": ">=8.1"
+    },
+    "autoload": {
+        "psr-4": {
+            "App\\": "src/"
+        }
+    },
+    "config": {
+        "optimize-autoloader": true
+    }
+}

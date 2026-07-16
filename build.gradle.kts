@@ -66,6 +66,37 @@ intellijPlatform {
             }
         }
     }
+
+    // --- Plugin signing (JetBrains Marketplace requires signed uploads) --------------------------
+    // `signPlugin` signs build/distributions/<version>.zip with the vendor's certificate before
+    // `publishPlugin` uploads it. The `zipSigner()` dependency (declared above) provides the signer.
+    // Credentials are read from the environment so nothing secret ever lives in the repo — set these
+    // three before running `./gw signPlugin` / `./gw publishPlugin`:
+    //   CERTIFICATE_CHAIN      the vendor certificate chain (PEM, e.g. `cat chain.crt`)
+    //   PRIVATE_KEY            the matching private key (PEM)
+    //   PRIVATE_KEY_PASSWORD   the private key's passphrase
+    // Generate a chain/key once per vendor per the JetBrains guide:
+    //   https://plugins.jetbrains.com/docs/intellij/plugin-signing.html
+    signing {
+        certificateChain = providers.environmentVariable("CERTIFICATE_CHAIN")
+        privateKey = providers.environmentVariable("PRIVATE_KEY")
+        password = providers.environmentVariable("PRIVATE_KEY_PASSWORD")
+    }
+
+    // `./gw publishPlugin` uploads the signed build/distributions/<version>.zip to the JetBrains
+    // Marketplace. The token is read from the PUBLISH_TOKEN env var (a Marketplace Hub permanent
+    // token, get one at https://plugins.jetbrains.com/author/me/tokens) so it never lives in the
+    // repo — do NOT paste a token value here.
+    //
+    // Channel "beta" (matching hotpath/callscape's first-upload posture): a non-default channel is
+    // invisible to normal users (installing needs a custom repo URL), and a brand-new plugin is
+    // additionally unlisted until JetBrains approves the first submission. For the real public
+    // launch, drop `channels` (or set it to listOf("")/listOf("default")) so it publishes to the
+    // default channel that ordinary Marketplace search and one-click install use.
+    publishing {
+        token = providers.environmentVariable("PUBLISH_TOKEN")
+        channels = listOf("beta")
+    }
 }
 
 // `./gw runPhpStorm` launches a PhpStorm sandbox with the plugin loaded for eyeballing — open a PHP
