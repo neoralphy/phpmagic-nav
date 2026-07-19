@@ -36,22 +36,22 @@ object MagicSites {
      * of the recognised container nodes AND at least one operand resolves to an enabled magic method.
      *
      * The container→operand mapping (all confirmed against real PhpStorm PSI):
-     *  - `(string)` cast    — [UnaryExpression] with an `opSTRING_CAST` operation; operand = its value
-     *  - `echo`             — [PhpEchoStatement]; operands = its arguments
-     *  - `print`            — [PhpPrintExpression]; operand = its argument
-     *  - interpolation      — [StringLiteralExpression]; operands = its embedded expressions (`"$m"`)
-     *  - concatenation      — [BinaryExpression]/[com.jetbrains.php.lang.psi.elements.ConcatenationExpression];
+     *  - `(string)` cast    - [UnaryExpression] with an `opSTRING_CAST` operation; operand = its value
+     *  - `echo`             - [PhpEchoStatement]; operands = its arguments
+     *  - `print`            - [PhpPrintExpression]; operand = its argument
+     *  - interpolation      - [StringLiteralExpression]; operands = its embedded expressions (`"$m"`)
+     *  - concatenation      - [BinaryExpression]/[com.jetbrains.php.lang.psi.elements.ConcatenationExpression];
      *                         operands = left & right (chained concat is nested, handled per node)
-     *  - concat-assign      — [SelfAssignmentExpression] `$s .= $obj` (`.=` only); operand = its RHS value
-     *  - dynamic invoke     — [FunctionReference] whose callee is an expression (`$callable(...)`);
+     *  - concat-assign      - [SelfAssignmentExpression] `$s .= $obj` (`.=` only); operand = its RHS value
+     *  - dynamic invoke     - [FunctionReference] whose callee is an expression (`$callable(...)`);
      *                         operand = the callee, magic = `__invoke`
-     *  - property read      — [FieldReference] `$o->p` that doesn't resolve → `__get`; operand = the ref
-     *  - property write     — [FieldReference] `$o->p = …` (write access) that doesn't resolve → `__set`;
+     *  - property read      - [FieldReference] `$o->p` that doesn't resolve → `__get`; operand = the ref
+     *  - property write     - [FieldReference] `$o->p = …` (write access) that doesn't resolve → `__set`;
      *                         a read-modify-write (`$o->p += …`, `$o->p++`) resolves to BOTH `__get` and `__set`
-     *  - method call        — [MethodReference] `$o->m()` / `Foo::m()` that doesn't resolve →
+     *  - method call        - [MethodReference] `$o->m()` / `Foo::m()` that doesn't resolve →
      *                         `__call` / `__callStatic`; operand = the whole call reference
      *
-     * Operands whose type is a scalar/string resolve to nothing and are silently dropped — which is
+     * Operands whose type is a scalar/string resolve to nothing and are silently dropped - which is
      * exactly what makes the nested cases self-dedup (e.g. `echo "x" . $m`: the echo argument is the
      * whole concat expression, type `string`, so echo contributes nothing and only the concat's `$m`
      * operand marks).
@@ -95,7 +95,7 @@ object MagicSites {
                 )
 
             // `$s .= $obj` desugars to `$s = $s . $obj`, so the right-hand value is coerced to string
-            // exactly like a plain concat — the same string context, just an assignment node instead
+            // exactly like a plain concat - the same string context, just an assignment node instead
             // of a BinaryExpression. Only the RHS is a *new* operand entering string context (the LHS
             // is the already-string accumulator). Gate strictly on `.=` so `$n += $x` isn't caught.
             element is SelfAssignmentExpression && isConcatAssign(element) ->
@@ -113,8 +113,8 @@ object MagicSites {
     }
 
     /**
-     * If [element] is a dynamic invoke — a [FunctionReference] whose callee is an *expression*
-     * (`$c(...)`, `($this->factory)(...)`, `$arr[0](...)`) rather than a named function — return that
+     * If [element] is a dynamic invoke - a [FunctionReference] whose callee is an *expression*
+     * (`$c(...)`, `($this->factory)(...)`, `$arr[0](...)`) rather than a named function - return that
      * callee expression; otherwise null.
      *
      * A named call like `strlen($x)` is also a [FunctionReference] but its callee is an identifier
@@ -155,13 +155,13 @@ object MagicSites {
      * Static field access (`Foo::$prop`) never triggers `__get`/`__set`, so it is excluded up front.
      * Class-constant access (`Foo::BAR`) is a separate [com.jetbrains.php.lang.psi.elements.ClassConstantReference],
      * not a [FieldReference], so it never reaches here. (Note: [FieldReference.isConstant] is *not* a
-     * class-constant test — it reports read/rvalue context — so it must not be used to gate this.)
+     * class-constant test - it reports read/rvalue context - so it must not be used to gate this.)
      */
     private fun fieldAccessSite(element: FieldReference, enabled: Set<MagicMethod>): List<MagicSite> {
         if (element.isStatic) return emptyList()
         // Which member-magic methods PHP fires on this access. A plain read fires `__get`; a plain
         // write (`$o->p = …`) fires `__set`; but a *read-modify-write* (`$o->p += …`, `$o->p++`,
-        // `--$o->p`) fires BOTH — PHP reads the current value via `__get`, applies the operator, then
+        // `--$o->p`) fires BOTH - PHP reads the current value via `__get`, applies the operator, then
         // writes the result via `__set`. The platform's RWAccess only exposes `isWriteAccess()` (no
         // ReadWrite state), so the compound/inc-dec case is recognised from the parent PSI.
         val magics: List<MagicMethod> = when {
@@ -184,14 +184,14 @@ object MagicSites {
     }
 
     /**
-     * Is this write-access field reference part of a read-modify-write — a compound assignment
+     * Is this write-access field reference part of a read-modify-write - a compound assignment
      * (`+=`, `.=`, `??=`, …) or an increment/decrement (`$o->p++`, `--$o->p`)? Those read the current
      * value (via `__get`) before writing the new one (via `__set`); a plain `$o->p = …` does not.
      * Only ever called once [FieldReference.isWriteAccess] is already known true.
      */
     private fun isReadModifyWrite(element: FieldReference): Boolean =
         when (val parent = element.parent) {
-            // `$o->p += …` etc. — guard that `element` is the assignment *target* (LHS `variable`),
+            // `$o->p += …` etc. - guard that `element` is the assignment *target* (LHS `variable`),
             // not some incidental value expression.
             is SelfAssignmentExpression -> parent.variable === element
             // `$o->p++` / `--$o->p`: the only unary operators that write to a field are `++`/`--`,
@@ -201,7 +201,7 @@ object MagicSites {
         }
 
     /**
-     * Does this member reference point at a *real declared* member — a property/const for a field
+     * Does this member reference point at a *real declared* member - a property/const for a field
      * ref, or the actually-named method for a call? A resolution that lands only on the magic method
      * itself (`__get`/`__call`, whose name differs from the accessed member) does NOT count, so those
      * sites are still recognised.
@@ -209,7 +209,7 @@ object MagicSites {
      * Note (heuristic boundary): PhpStorm resolves *by declaration*, not by call-site accessibility.
      * A `private`/`protected` member reached from an outside scope still resolves here, so a magic
      * call triggered purely by *visibility* (PHP invokes `__get`/`__call` for inaccessible members)
-     * is intentionally NOT marked — we prefer missing that rare case to falsely marking legitimate
+     * is intentionally NOT marked - we prefer missing that rare case to falsely marking legitimate
      * member access. A member documented via `@property`/`@method` phpdoc also resolves (to the
      * phpdoc declaration) and is treated as real, since the IDE already navigates it natively.
      */
@@ -240,8 +240,8 @@ object MagicSites {
     private fun interpolationOperands(str: StringLiteralExpression): List<PhpTypedElement> =
         str.children.mapNotNull { child ->
             when (child) {
-                // Simple `"$m"` — the Variable is a direct child (no PhpTypedElement child of its own).
-                // Complex `"{$m->prop}"` — the direct child is a brace-wrapper Variable around a
+                // Simple `"$m"` - the Variable is a direct child (no PhpTypedElement child of its own).
+                // Complex `"{$m->prop}"` - the direct child is a brace-wrapper Variable around a
                 // FieldReference/MethodReference; unwrap one level to the meaningful expression.
                 is PhpTypedElement ->
                     PsiTreeUtil.getChildOfType(child, PhpTypedElement::class.java) ?: child

@@ -29,7 +29,7 @@ class MagicNavSettings : SimplePersistentStateComponent<MagicNavSettings.State>(
         var reverseFindUsages: Boolean by property(true)
     }
 
-    /** The set of magic methods to detect right now — empty when the master switch is off. */
+    /** The set of magic methods to detect right now - empty when the master switch is off. */
     fun enabledMethods(): Set<MagicMethod> {
         if (!state.enabled) return emptySet()
         val set = LinkedHashSet<MagicMethod>(MagicMethod.entries.size)

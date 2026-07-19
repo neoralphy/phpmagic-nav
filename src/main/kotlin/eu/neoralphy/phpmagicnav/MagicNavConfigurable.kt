@@ -28,32 +28,32 @@ class MagicNavConfigurable : BoundConfigurable("PHP Magic Nav") {
         }
         indent {
             row {
-                checkBox("__toString()  — (string) cast, echo, print, interpolation, concatenation")
+                checkBox("__toString() - (string) cast, echo, print, interpolation, concatenation")
                     .bindSelected(settings::markToString)
                     .enabledIf(master.selected)
             }
             row {
-                checkBox("__invoke()  — dynamic \$callable(...) invocations")
+                checkBox("__invoke() - dynamic \$callable(...) invocations")
                     .bindSelected(settings::markInvoke)
                     .enabledIf(master.selected)
             }
             row {
-                checkBox("__get()  — \$obj->prop read of an undeclared property")
+                checkBox("__get() - \$obj->prop read of an undeclared property")
                     .bindSelected(settings::markGet)
                     .enabledIf(master.selected)
             }
             row {
-                checkBox("__set()  — \$obj->prop = … write to an undeclared property")
+                checkBox("__set() - \$obj->prop = … write to an undeclared property")
                     .bindSelected(settings::markSet)
                     .enabledIf(master.selected)
             }
             row {
-                checkBox("__call()  — \$obj->method(...) call of an undeclared method")
+                checkBox("__call() - \$obj->method(...) call of an undeclared method")
                     .bindSelected(settings::markCall)
                     .enabledIf(master.selected)
             }
             row {
-                checkBox("__callStatic()  — Foo::method(...) call of an undeclared static method")
+                checkBox("__callStatic() - Foo::method(...) call of an undeclared static method")
                     .bindSelected(settings::markCallStatic)
                     .enabledIf(master.selected)
             }

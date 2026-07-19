@@ -104,7 +104,7 @@ class MagicNavEdgeCaseTest : BasePlatformTestCase() {
             ${'$'}s = "";
             ${'$'}s .= ${'$'}m;            // RHS coerced via __toString
             ${'$'}n = 0;
-            ${'$'}n += 5;                 // NOT a string context — must stay unmarked
+            ${'$'}n += 5;                 // NOT a string context - must stay unmarked
             """.trimIndent(),
         )
         assertEquals(
@@ -117,7 +117,7 @@ class MagicNavEdgeCaseTest : BasePlatformTestCase() {
 
     fun testConcatAssignWithNestedConcatSelfDedups() {
         // `$s .= $a . $m`: the RHS is itself a concat (type string), so the assignment node
-        // contributes nothing and only the inner concat's operands mark — no double count.
+        // contributes nothing and only the inner concat's operands mark - no double count.
         val file = myFixture.configureByText(
             "edge.php",
             """
@@ -295,7 +295,7 @@ class MagicNavEdgeCaseTest : BasePlatformTestCase() {
 
     fun testComplexInterpolationUsesFieldType() {
         // `"$u->money"` / `"{$u->money}"`: the operand is the PROPERTY, so the property's type
-        // (Money) drives __toString — not the receiver $u's type.
+        // (Money) drives __toString - not the receiver $u's type.
         val byStmt = sites(
             """
             <?php
@@ -369,7 +369,7 @@ class MagicNavEdgeCaseTest : BasePlatformTestCase() {
 
     fun testPrivateMemberFromInsideClassResolves() {
         // A private member accessed from INSIDE the class resolves to its real declaration, so no
-        // magic marker — even though the class also declares __get/__call. (The documented
+        // magic marker - even though the class also declares __get/__call. (The documented
         // visibility trade-off only concerns access from OUTSIDE the class.)
         val byStmt = sites(
             """
@@ -439,7 +439,7 @@ class MagicNavEdgeCaseTest : BasePlatformTestCase() {
     }
 
     fun testReadModifyWriteOnRealPropertyStaysUnmarked() {
-        // A compound assignment to a genuinely declared property must NOT be magic — the member
+        // A compound assignment to a genuinely declared property must NOT be magic - the member
         // resolves, so neither __get nor __set fires.
         val byStmt = sites(
             """
@@ -585,5 +585,241 @@ class MagicNavEdgeCaseTest : BasePlatformTestCase() {
             count += MagicSites.sitesFor(node, all).size
         }
         assertTrue("sitesFor survived the malformed file (produced $count sites)", count >= 0)
+    }
+
+    // ---- Types: nullable operand resolves the non-null member, drops null ------------------------
+
+    fun testNullableTypeResolvesNonNullMember() {
+        // A `?Money` parameter has type `\Money|null`; the null half is a primitive and must be
+        // skipped, leaving exactly Money::__toString - a nullable value is a real, common shape.
+        val byStmt = sites(
+            """
+            <?php
+            class Money { public function __toString(): string { return "m"; } }
+            function f(?Money ${'$'}m): void { echo ${'$'}m; }
+            """.trimIndent(),
+        )
+        assertEquals(
+            "a nullable ?Money resolves only the Money member, not null",
+            setOf("\\Money::__toString"),
+            byStmt.magicFor("echo \$m;", MagicMethod.TO_STRING).flatMap { it.labels() }.toSet(),
+        )
+    }
+
+    // ---- Two magic methods on one operand: __invoke result is then string-coerced ----------------
+
+    fun testInvokeReturningStringableFiresBothMagics() {
+        // `echo $c()` where $c is invokable and __invoke returns a Stringable: PHP runs __invoke,
+        // then coerces its result via __toString. Both jumps must be offered on the one operand.
+        val byStmt = sites(
+            """
+            <?php
+            class Money { public function __toString(): string { return "m"; } }
+            class Maker { public function __invoke(): Money { return new Money(); } }
+            ${'$'}c = new Maker();
+            echo ${'$'}c();
+            """.trimIndent(),
+        )
+        assertEquals(
+            "__invoke on the callee is a site",
+            setOf("\\Maker::__invoke"),
+            byStmt.magicFor("echo \$c();", MagicMethod.INVOKE).flatMap { it.labels() }.toSet(),
+        )
+        assertEquals(
+            "the invoke result being echoed is a __toString site",
+            setOf("\\Money::__toString"),
+            byStmt.magicFor("echo \$c();", MagicMethod.TO_STRING).flatMap { it.labels() }.toSet(),
+        )
+    }
+
+    // ---- Enums are classes too: a backed enum with __toString is a real site ---------------------
+
+    fun testEnumWithToStringInStringContext() {
+        val byStmt = sites(
+            """
+            <?php
+            enum Suit: string {
+                case Hearts = 'H';
+                public function __toString(): string { return ${'$'}this->value; }
+            }
+            function f(Suit ${'$'}s): void { echo ${'$'}s; }
+            """.trimIndent(),
+        )
+        assertEquals(
+            "an enum that declares __toString is a string-context site",
+            setOf("\\Suit::__toString"),
+            byStmt.magicFor("echo \$s;", MagicMethod.TO_STRING).flatMap { it.labels() }.toSet(),
+        )
+    }
+
+    // ---- Short-echo `<?= $m ?>` is an echo statement and must mark its operand -------------------
+
+    fun testShortEchoTagMarksOperand() {
+        val file = myFixture.configureByText(
+            "edge.php",
+            """
+            <?php
+            class Money { public function __toString(): string { return "m"; } }
+            ${'$'}m = new Money();
+            ?>
+            <div><?= ${'$'}m ?></div>
+            """.trimIndent(),
+        ) as PhpFile
+        val labels = PsiTreeUtil.collectElementsOfType(file, PsiElement::class.java)
+            .flatMap { MagicSites.sitesFor(it, all) }
+            .filter { it.magic == MagicMethod.TO_STRING }
+            .flatMap { it.labels() }.toSet()
+        assertEquals(
+            "the `<?= \$m ?>` short-echo operand resolves to Money::__toString",
+            setOf("\\Money::__toString"), labels,
+        )
+    }
+
+    // ---- Nullsafe `?->` on an undeclared member still fires the magic method ---------------------
+
+    fun testNullsafeMemberAccessFiresMagic() {
+        val byStmt = sites(
+            """
+            <?php
+            class Bag {
+                public function __get(${'$'}n) { return 1; }
+                public function __call(${'$'}n, ${'$'}a) { return 1; }
+            }
+            ${'$'}b = new Bag();
+            ${'$'}g = ${'$'}b?->missing;
+            ${'$'}c = ${'$'}b?->run();
+            """.trimIndent(),
+        )
+        assertEquals(
+            "nullsafe read of an undeclared property fires __get",
+            setOf("\\Bag::__get"),
+            byStmt.magicFor("\$g = \$b?->missing;", MagicMethod.GET).flatMap { it.labels() }.toSet(),
+        )
+        assertEquals(
+            "nullsafe call of an undeclared method fires __call",
+            setOf("\\Bag::__call"),
+            byStmt.magicFor("\$c = \$b?->run();", MagicMethod.CALL).flatMap { it.labels() }.toSet(),
+        )
+    }
+
+    // ---- False-positive guard: a class-constant reference is never a __get site ------------------
+
+    fun testClassConstantNeverFiresGet() {
+        // `Foo::BAR` (and even an undeclared `Foo::MISSING`) is a ClassConstantReference, not a
+        // FieldReference, so it must never be mistaken for a __get property access.
+        val byStmt = sites(
+            """
+            <?php
+            class Foo {
+                const BAR = 1;
+                public function __get(${'$'}n) { return 1; }
+            }
+            ${'$'}x = Foo::BAR;
+            ${'$'}y = Foo::MISSING;
+            """.trimIndent(),
+        )
+        assertNoSite(byStmt, "\$x = Foo::BAR;")
+        assertNoSite(byStmt, "\$y = Foo::MISSING;")
+    }
+
+    // ---- `??=` on an undeclared property reads then writes: both __get and __set -----------------
+
+    fun testNullCoalesceAssignFiresGetAndSet() {
+        // `$b->missing ??= 5` desugars to a read (to test null) then a conditional write, so PHP
+        // can fire both __get and __set - the same read-modify-write shape as `+=`.
+        val byStmt = sites(
+            """
+            <?php
+            class Bag {
+                public function __get(${'$'}n) { return 1; }
+                public function __set(${'$'}n, ${'$'}v) {}
+            }
+            ${'$'}b = new Bag();
+            ${'$'}b->missing ??= 5;
+            """.trimIndent(),
+        )
+        assertEquals(
+            "`??=` on an undeclared property fires both __get and __set",
+            setOf(MagicMethod.GET, MagicMethod.SET),
+            byStmt["\$b->missing ??= 5;"].orEmpty().map { it.magic }.toSet(),
+        )
+    }
+
+    // ---- Union receiver: only the member that declares the magic method is offered ---------------
+
+    fun testUnionReceiverOffersOnlyDeclaringMemberForGet() {
+        // `$o` is `A|B` and only A declares __get: the site must resolve to A::__get alone, never B.
+        val byStmt = sites(
+            """
+            <?php
+            class A { public function __get(${'$'}n) { return 1; } }
+            class B {}
+            function f(bool ${'$'}x): void {
+                ${'$'}o = ${'$'}x ? new A() : new B();
+                ${'$'}v = ${'$'}o->missing;
+            }
+            """.trimIndent(),
+        )
+        assertEquals(
+            "only the union member declaring __get is offered",
+            setOf("\\A::__get"),
+            byStmt.magicFor("\$v = \$o->missing;", MagicMethod.GET).flatMap { it.labels() }.toSet(),
+        )
+    }
+
+    // ---- Trait-provided __get / __set are real declarations on the using class -------------------
+
+    fun testGetAndSetFromTrait() {
+        val byStmt = sites(
+            """
+            <?php
+            trait Bag {
+                public function __get(${'$'}n) { return 1; }
+                public function __set(${'$'}n, ${'$'}v) {}
+            }
+            class Widget { use Bag; }
+            ${'$'}w = new Widget();
+            ${'$'}v = ${'$'}w->missing;
+            ${'$'}w->other = 5;
+            """.trimIndent(),
+        )
+        assertTrue(
+            "a trait-provided __get is a site",
+            byStmt.magicFor("\$v = \$w->missing;", MagicMethod.GET)
+                .flatMap { it.targets }.all { it.name == "__get" }
+                && byStmt.magicFor("\$v = \$w->missing;", MagicMethod.GET).isNotEmpty(),
+        )
+        assertTrue(
+            "a trait-provided __set is a site",
+            byStmt.magicFor("\$w->other = 5;", MagicMethod.SET)
+                .flatMap { it.targets }.all { it.name == "__set" }
+                && byStmt.magicFor("\$w->other = 5;", MagicMethod.SET).isNotEmpty(),
+        )
+    }
+
+    // ---- Undeclared property inside interpolation fires BOTH __get and its __toString coercion ---
+
+    fun testInterpolatedUndeclaredPropertyFiresGetAndToString() {
+        // `"{$o->missing}"` where __get returns a Stringable: the embedded field access fires __get,
+        // and the value it yields is coerced to string - both magic events on the interpolated site.
+        val byStmt = sites(
+            """
+            <?php
+            class Inner { public function __toString(): string { return "i"; } }
+            class Outer { public function __get(${'$'}n): Inner { return new Inner(); } }
+            ${'$'}o = new Outer();
+            ${'$'}s = "v {${'$'}o->missing}";
+            """.trimIndent(),
+        )
+        assertEquals(
+            "the interpolated undeclared read fires __get",
+            setOf("\\Outer::__get"),
+            byStmt.magicFor("\$s = \"v {\$o->missing}\";", MagicMethod.GET).flatMap { it.labels() }.toSet(),
+        )
+        assertEquals(
+            "the interpolated value is string-coerced via Inner::__toString",
+            setOf("\\Inner::__toString"),
+            byStmt.magicFor("\$s = \"v {\$o->missing}\";", MagicMethod.TO_STRING).flatMap { it.labels() }.toSet(),
+        )
     }
 }

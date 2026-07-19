@@ -48,7 +48,7 @@ class MagicNavProofTest : BasePlatformTestCase() {
         print ${'$'}m;                 // (3) print argument
         ${'$'}i = "amount: ${'$'}m";    // (4) interpolation
         ${'$'}c = "a" . ${'$'}m . "b";  // (5) concatenation
-        echo "x" . ${'$'}m;            // (6) concat inside echo — echo must NOT also mark (dedup)
+        echo "x" . ${'$'}m;            // (6) concat inside echo - echo must NOT also mark (dedup)
 
         ${'$'}add = new Adder();
         ${'$'}r = ${'$'}add(1, 2);      // (7) __invoke

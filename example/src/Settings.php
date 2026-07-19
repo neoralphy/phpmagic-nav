@@ -15,7 +15,7 @@ namespace App;
  */
 final class Settings
 {
-    /** A REAL declared property — access to this is NOT magic and is deliberately not marked. */
+    /** A REAL declared property - access to this is NOT magic and is deliberately not marked. */
     public string $version = '1.0';
 
     /** @var array<string, mixed> */

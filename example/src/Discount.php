@@ -6,7 +6,7 @@ namespace App;
 
 /**
  * A callable object. Because it declares __invoke(), an instance can be "called" like a function:
- * `$discount($cents)` runs __invoke() — no method name appears at the call site, so the IDE
+ * `$discount($cents)` runs __invoke() - no method name appears at the call site, so the IDE
  * normally offers no jump. The plugin marks `$discount(...)` and jumps to __invoke().
  */
 final class Discount

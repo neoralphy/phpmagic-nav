@@ -70,7 +70,7 @@ intellijPlatform {
     // --- Plugin signing (JetBrains Marketplace requires signed uploads) --------------------------
     // `signPlugin` signs build/distributions/<version>.zip with the vendor's certificate before
     // `publishPlugin` uploads it. The `zipSigner()` dependency (declared above) provides the signer.
-    // Credentials are read from the environment so nothing secret ever lives in the repo — set these
+    // Credentials are read from the environment so nothing secret ever lives in the repo - set these
     // three before running `./gw signPlugin` / `./gw publishPlugin`:
     //   CERTIFICATE_CHAIN      the vendor certificate chain (PEM, e.g. `cat chain.crt`)
     //   PRIVATE_KEY            the matching private key (PEM)
@@ -86,7 +86,7 @@ intellijPlatform {
     // `./gw publishPlugin` uploads the signed build/distributions/<version>.zip to the JetBrains
     // Marketplace. The token is read from the PUBLISH_TOKEN env var (a Marketplace Hub permanent
     // token, get one at https://plugins.jetbrains.com/author/me/tokens) so it never lives in the
-    // repo — do NOT paste a token value here.
+    // repo - do NOT paste a token value here.
     //
     // Channel "beta" (matching hotpath/callscape's first-upload posture): a non-default channel is
     // invisible to normal users (installing needs a custom repo URL), and a brand-new plugin is
@@ -99,7 +99,7 @@ intellijPlatform {
     }
 }
 
-// `./gw runPhpStorm` launches a PhpStorm sandbox with the plugin loaded for eyeballing — open a PHP
+// `./gw runPhpStorm` launches a PhpStorm sandbox with the plugin loaded for eyeballing - open a PHP
 // file with a Stringable class and a (string) cast / echo to see the gutter markers.
 intellijPlatformTesting {
     runIde {

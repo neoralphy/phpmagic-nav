@@ -1,11 +1,11 @@
 <!--
-  PHP Magic Method Navigation — Marketplace plugin icon (40px), light-theme variant.
-  Dark twin in pluginIcon_dark.svg. Visual language: a "go to declaration" jump — a blue arc
+  PHP Magic Method Navigation - Marketplace plugin icon (40px), light-theme variant.
+  Dark twin in pluginIcon_dark.svg. Visual language: a "go to declaration" jump - a blue arc
   that springs up from an invisible magic call site and lands (arrowhead) on the method that
   actually runs. The gray double bar underneath is the `__` double-underscore motif every PHP
   dev reads as "magic method"; the blue sparkle is the "magic" (the implicit, unspelled call).
   Family resemblance to the same vendor's other plugins: plate-less, structural gray #6E7681,
-  rounded ~2.6 stroke, a single saturated accent — here JetBrains blue #3574F0 (same blue as the
+  rounded ~2.6 stroke, a single saturated accent - here JetBrains blue #3574F0 (same blue as the
   in-editor gutter icon icons/magicNav.svg) rather than teal/fire.
 -->
 <svg width="40" height="40" viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">

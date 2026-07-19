@@ -15,7 +15,7 @@ namespace App;
  */
 final class Sdk
 {
-    /** A REAL declared method — this call is NOT magic and is deliberately not marked. */
+    /** A REAL declared method - this call is NOT magic and is deliberately not marked. */
     public function reset(): void
     {
     }

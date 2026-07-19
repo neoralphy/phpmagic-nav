@@ -17,17 +17,17 @@ import com.jetbrains.php.lang.psi.elements.Method
 
 /**
  * Reverse navigation: **Find Usages** on a magic method surfaces the *implicit* invocation sites that
- * trigger it — the `(string)` casts / `echo`s for `__toString`, the `$obj->prop` accesses for
+ * trigger it - the `(string)` casts / `echo`s for `__toString`, the `$obj->prop` accesses for
  * `__get`/`__set`, the unresolved `$obj->m()` calls for `__call`, and so on. PhpStorm's own Find
  * Usages only finds explicit textual references to `__toString`, so those implicit sites are normally
  * invisible from the declaration side; this fills the same gap the gutter markers fill, in reverse.
  *
  * It reuses [MagicSites] as the single source of truth, so a site that the gutter marks forward is
- * exactly a site this lists in reverse — the two directions can never disagree.
+ * exactly a site this lists in reverse - the two directions can never disagree.
  *
  * ## How the scan is bounded
  * An implicit site necessarily involves a value whose inferred type is the magic method's class, and
- * that type is only inferable in a file that names the class (a `new C`, a `C` type hint, etc.) — the
+ * that type is only inferable in a file that names the class (a `new C`, a `C` type hint, etc.) - the
  * same precondition the forward markers rely on. So we restrict the (otherwise project-wide) scan to
  * files that contain the class's short name via the identifier index, then run [MagicSites.sitesFor]
  * over each and keep the sites whose target is the very method being searched. Find Usages is a

@@ -1,5 +1,5 @@
 <!--
-  PHP Magic Method Navigation — Marketplace plugin icon (40px), dark-theme variant of
+  PHP Magic Method Navigation - Marketplace plugin icon (40px), dark-theme variant of
   pluginIcon.svg: identical geometry, the structural gray lifted a step (#6E7681 -> #8B949E) so
   the `__` bars read on dark backgrounds, and the blue nudged brighter (#3574F0 -> #548AF7) to
   keep the jump/sparkle vivid against a dark listing card.

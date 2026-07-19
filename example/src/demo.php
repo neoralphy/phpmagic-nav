@@ -6,7 +6,7 @@ namespace App;
 
 /*
  * ---------------------------------------------------------------------------------------------
- * PHP Magic Method Navigation — showcase.
+ * PHP Magic Method Navigation - showcase.
  *
  * Every line flagged "MAGIC ->" below is an IMPLICIT magic-method call: PHP runs a method whose
  * name never appears in the source. Open this file in PhpStorm with the plugin installed. A
@@ -18,7 +18,7 @@ namespace App;
  * ---------------------------------------------------------------------------------------------
  */
 
-/** Returns one of two Stringables — a union type, to demo the multi-target popup. */
+/** Returns one of two Stringables - a union type, to demo the multi-target popup. */
 function priceOrRate(bool $asRate): Money|Percentage
 {
     return $asRate ? new Percentage(12.5) : new Money(1999);

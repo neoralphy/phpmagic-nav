@@ -4,50 +4,75 @@
     <vendor email="pelyhearon@gmail.com" url="https://github.com/neoralphy">neoralphy</vendor>
 
     <description><![CDATA[
-        <p><b>Navigate PHP's invisible magic-method calls.</b></p>
-        <p>PHP invokes some methods <i>implicitly</i>: a <code>(string)</code> cast or an
-        <code>echo</code> secretly calls <code>__toString()</code>; <code>$callable(...)</code>
-        secretly calls <code>__invoke()</code>; <code>$obj->prop</code> / <code>$obj->method()</code>
-        fall through to <code>__get()</code>/<code>__set()</code>/<code>__call()</code> when the
-        member isn't really declared. None of these mention the method by name, so the IDE offers no
-        jump to the code that actually runs. This plugin adds it.</p>
+        <p><b>Jump to the method PHP runs but never names.</b> PHP calls some methods
+        <i>implicitly</i>: a <code>(string)</code> cast or an <code>echo</code> quietly runs
+        <code>__toString()</code>, <code>$callable(...)</code> runs <code>__invoke()</code>, and
+        <code>$obj->prop</code> / <code>$obj->method()</code> fall through to
+        <code>__get()</code> / <code>__set()</code> / <code>__call()</code> when the member is not
+        really declared. None of these write the method's name, so Ctrl+Click and Go to Declaration
+        have nothing to jump to. This plugin gives every one of those sites a gutter icon and a jump
+        to the code that actually executes.</p>
+
+        <p>Reading the source, the call is invisible: <code>echo $money;</code> shows no method,
+        yet it runs <code>Money::__toString()</code>; <code>$discount(1999)</code> looks like a
+        function call but runs <code>Discount::__invoke()</code>; <code>$obj->missing</code> looks
+        like a plain property read but runs <code>__get()</code>. You know the method exists, you
+        just cannot get there without scrolling and searching by hand. The gutter icon closes that
+        gap: click it and land on the method.</p>
+
         <ul>
-            <li>A <b>gutter icon</b> at every implicit site — a <code>(string)</code> cast, an
-                <code>echo</code>/<code>print</code>, string interpolation (<code>"$obj"</code>),
-                concatenation (<code>"x" . $obj</code>), dynamic invokes (<code>$callable(...)</code>),
-                and member access that resolves to no real member: <code>$obj->prop</code> →
-                <code>__get()</code>, <code>$obj->prop = …</code> → <code>__set()</code>,
-                <code>$obj->m(...)</code> → <code>__call()</code>, <code>Foo::m(...)</code> →
-                <code>__callStatic()</code>. Union types open a multi-target popup.</li>
-            <li><b>Go to Declaration</b> (Ctrl+Click / Ctrl+B) on the operand also offers the magic
-                method, alongside the normal jump.</li>
-            <li><b>Reverse Find Usages</b>: running Find Usages on a magic method (e.g.
-                <code>__toString</code>) also lists the implicit sites that trigger it.</li>
-            <li>Only marks member access when the magic method genuinely fires — a reference that
-                resolves to a real declared property/const/method is left alone. Correctly handles the
-                <code>\Stringable</code> interface, nullable/union types (only members that actually
-                declare the method are offered), and de-duplicates so nested and multi-argument sites
-                never double-mark.</li>
+          <li><b>A gutter icon at every implicit site.</b> A <code>(string)</code> cast, an
+              <code>echo</code> / <code>print</code>, string interpolation (<code>"$obj"</code>),
+              concatenation (<code>"x" . $obj</code>), a dynamic invoke (<code>$callable(...)</code>),
+              and member access that resolves to no real member: <code>$obj->prop</code> read
+              &#8594; <code>__get()</code>, <code>$obj->prop = …</code> &#8594; <code>__set()</code>,
+              <code>$obj->m(...)</code> &#8594; <code>__call()</code>, <code>Foo::m(...)</code>
+              &#8594; <code>__callStatic()</code>. When a union type
+              (<code>Money|Percentage</code>) can dispatch to more than one implementation, the icon
+              opens a multi-target popup.</li>
+          <li><b>Go to Declaration keeps working.</b> Ctrl+Click / Ctrl+B on the operand offers the
+              magic method <i>alongside</i> the normal jump, so you never lose the navigation you
+              already rely on.</li>
+          <li><b>Reverse Find Usages.</b> Run Find Usages on a magic method itself (e.g.
+              <code>__toString</code>, <code>__get</code>, <code>__call</code>) and the results
+              include the implicit sites that trigger it: the casts, the interpolations, the
+              <code>$obj->prop</code> accesses that PhpStorm's own Find Usages never lists.</li>
+          <li><b>Precise, not noisy.</b> Member access is marked only when the magic method really
+              fires: a reference that resolves to a real declared property, constant, or method is
+              left alone. It understands the <code>\Stringable</code> interface and nullable / union
+              types (only the members that actually declare the method are offered), and it
+              de-duplicates so nested and multi-argument sites never double-mark.</li>
+          <li><b>Yours to shape.</b> A master switch plus a per-method toggle for
+              <code>__toString</code>, <code>__invoke</code>, <code>__get</code>, <code>__set</code>,
+              <code>__call</code>, <code>__callStatic</code>, and reverse Find Usages, under
+              <b>Settings | Tools | PHP Magic Nav</b>.</li>
         </ul>
-        <p>Configurable under <b>Settings | Tools | PHP Magic Nav</b>.</p>
+
+        <p><b>Free, and staying free.</b> Every feature above is free for any use, including
+        commercial. There is no paid tier, no account, no telemetry: the plugin runs entirely inside
+        your IDE and nothing about your code ever leaves your machine.</p>
+
+        <p>Built for PhpStorm, where the PHP language support ships in the box. It reuses the IDE's
+        own type resolution to decide what runs, so a marked site is a site PHP would truly dispatch
+        to a magic method.</p>
     ]]></description>
 
     <change-notes><![CDATA[
         <ul>
-            <li><b>0.2.1</b> — A read-modify-write on an undeclared property
+            <li><b>0.2.1</b> - A read-modify-write on an undeclared property
                 (<code>$obj->prop += …</code>, <code>$obj->prop++</code>) now offers <b>both</b>
-                <code>__get()</code> and <code>__set()</code> — PHP reads the old value then writes the
+                <code>__get()</code> and <code>__set()</code> - PHP reads the old value then writes the
                 new one, so both fire. When two magic methods fire on the same operand (e.g.
                 <code>echo $obj->prop</code> where <code>__get</code> returns a <code>Stringable</code>),
                 the gutter marker now offers every jump instead of silently dropping one.</li>
-            <li><b>0.2.0</b> — Member-access magic: gutter markers + Go to Declaration for
+            <li><b>0.2.0</b> - Member-access magic: gutter markers + Go to Declaration for
                 <code>__get()</code>/<code>__set()</code> on undeclared <code>$obj->prop</code>
                 read/write, and <code>__call()</code>/<code>__callStatic()</code> on undeclared
-                <code>$obj->m(...)</code>/<code>Foo::m(...)</code> calls — only when the member does
+                <code>$obj->m(...)</code>/<code>Foo::m(...)</code> calls - only when the member does
                 not resolve to a real declaration. Added <b>reverse Find Usages</b>: Find Usages on a
                 magic method lists its implicit invocation sites. Per-method settings toggles for all
                 six magic methods plus reverse Find Usages.</li>
-            <li><b>0.1.0</b> — First release. Forward navigation to <code>__toString()</code> from
+            <li><b>0.1.0</b> - First release. Forward navigation to <code>__toString()</code> from
                 casts, echo/print, interpolation and concatenation; navigation to
                 <code>__invoke()</code> from dynamic <code>$callable(...)</code> calls; gutter markers
                 + Go to Declaration; multi-target unions; settings toggles.</li>

@@ -8,7 +8,7 @@ import com.jetbrains.php.lang.psi.elements.Method
 
 /**
  * Makes Ctrl+Click / Ctrl+B (Go to Declaration) on the operand of an implicit magic-method site also
- * offer the magic method that runs there — e.g. Ctrl+B on `$m` in `echo $m` adds `Money::__toString`
+ * offer the magic method that runs there - e.g. Ctrl+B on `$m` in `echo $m` adds `Money::__toString`
  * next to the variable's own declaration. Targets are *added* to whatever the platform already
  * resolves, so the user gets a multi-target popup rather than losing the normal jump.
  *

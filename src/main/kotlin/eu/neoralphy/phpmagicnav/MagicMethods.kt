@@ -10,8 +10,8 @@ import com.jetbrains.php.lang.psi.resolve.types.PhpType
  * The PHP "magic methods" this plugin can navigate to from their *implicit* invocation sites.
  *
  * PhpStorm resolves an explicit `$x->__toString()` call natively, but the language invokes these
- * methods implicitly — a `(string)` cast never mentions `__toString`, `$callable(...)` never
- * mentions `__invoke` — and the IDE offers no jump from those sites to the method that actually
+ * methods implicitly - a `(string)` cast never mentions `__toString`, `$callable(...)` never
+ * mentions `__invoke` - and the IDE offers no jump from those sites to the method that actually
  * runs. That gap is what this plugin fills.
  */
 enum class MagicMethod(
@@ -24,7 +24,7 @@ enum class MagicMethod(
     INVOKE("__invoke", "__invoke()"),
 
     // Member-access magic. Unlike the two above (which fire on *every* string/callable use of the
-    // operand), these only fire when the named member does NOT resolve to a real declared one —
+    // operand), these only fire when the named member does NOT resolve to a real declared one -
     // `$o->prop` calls `__get` only when `prop` isn't a real property, `$o->m()` calls `__call` only
     // when `m()` isn't a real method. That "member unresolved" gate lives in [MagicSites].
     GET("__get", "__get()"),
@@ -75,7 +75,7 @@ object MagicMethodResolver {
             // Cheap primitive skip: PHP primitive/pseudo types (\string, \int, \bool, \array, null,
             // mixed, callable, …) never declare a magic method, and skipping them keeps the common
             // scalar path off the index. We ask the platform's own primitive check rather than a
-            // first-letter-case heuristic: a lowercase-*named* class (`class money {}` — legal,
+            // first-letter-case heuristic: a lowercase-*named* class (`class money {}` - legal,
             // case-insensitive PHP) is NOT a primitive and must still be resolved. The old
             // `fqn[0].isLowerCase()` shortcut silently dropped every such class (false negative).
             if (fqn.isEmpty() || PhpType.isPrimitiveType(fqn)) continue
@@ -93,6 +93,6 @@ object MagicMethodResolver {
         "${method.containingClass?.fqn}::${method.name}"
 }
 
-/** Deepest-first leaf of an element — the platform contract anchor for line markers. */
+/** Deepest-first leaf of an element - the platform contract anchor for line markers. */
 internal fun PsiElement.leafAnchor(): PsiElement =
     com.intellij.psi.util.PsiTreeUtil.getDeepestFirst(this)
