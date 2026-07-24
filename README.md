@@ -130,7 +130,5 @@ reached from outside) and `@property`/`@method`-documented members are treated a
 
 ## License
 
-Custom free-use license - see [`LICENSE`](LICENSE). PHP Magic Method Navigation is **free to
-install and use for any purpose, including commercial use, at no cost**. The source is proprietary:
-all rights reserved, with no copying, modifying, redistributing, sublicensing, selling, or
-derivative works permitted without the copyright holder's prior written permission.
+[MIT](LICENSE) - free and open source. Install, use, read, fork, and modify it freely,
+including for commercial use.
