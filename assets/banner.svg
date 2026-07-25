@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 880 180" role="img" aria-label="PHP Magic Nav - jump to the __toString that runs">
+  <defs>
+    <linearGradient id="tile" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#7E6CD4"/>
+      <stop offset="1" stop-color="#574A9E"/>
+    </linearGradient>
+    <linearGradient id="ramp" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#3E9E90"/>
+      <stop offset="0.28" stop-color="#2C86B8"/>
+      <stop offset="0.5" stop-color="#3B82F6"/>
+      <stop offset="0.72" stop-color="#7C5CEC"/>
+      <stop offset="1" stop-color="#C24DD6"/>
+    </linearGradient>
+  </defs>
+  <rect x="1" y="1" width="878" height="178" rx="20" fill="#1B2028" stroke="#2A313B" stroke-width="1.5"/>
+  <rect x="28" y="34" width="112" height="112" rx="24" fill="url(#tile)"/>
+  <!-- mark: navigate-arrow into two underscores (jump to __toString) -->
+  <path d="M54 71 L78 90 L54 109 Z" fill="#F3F1FB"/>
+  <rect x="84" y="82" width="26" height="7" rx="3.5" fill="#F3F1FB"/>
+  <rect x="84" y="97" width="26" height="7" rx="3.5" fill="#F3F1FB"/>
+  <text x="176" y="82" font-family="'Segoe UI',system-ui,-apple-system,Helvetica,Arial,sans-serif" font-size="41" font-weight="700" fill="#8E7CE0">PHP Magic Nav</text>
+  <text x="178" y="118" font-family="'Segoe UI',system-ui,-apple-system,Helvetica,Arial,sans-serif" font-size="21" fill="#98A0AD">Jump to the <tspan font-family="ui-monospace,Menlo,monospace" fill="#C7BEEC">__toString()</tspan> that actually runs.</text>
+  <rect x="178" y="138" width="300" height="6" rx="3" fill="url(#ramp)"/>
+</svg>

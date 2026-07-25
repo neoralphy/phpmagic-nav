@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="assets/banner.svg" alt="PHP Magic Nav" width="820">
+</p>
+
 # PHP Magic Method Navigation
 
 A PhpStorm plugin that navigates PHP's **implicit magic-method calls** - the ones the language runs
