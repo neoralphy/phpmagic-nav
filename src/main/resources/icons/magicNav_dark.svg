@@ -1,0 +1,8 @@
+<svg width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <!-- Dark-theme gutter variant of magicNav.svg: identical geometry, blue nudged brighter
+       (#3574F0 -> #548AF7) so the jump + double-underscore read on dark editor gutters. -->
+  <path d="M2.6 7.4 C 2.3 3.9, 5.5 2.6, 8.2 4.3" stroke="#548AF7" stroke-width="1.7" stroke-linecap="round"/>
+  <path d="M8.5 2.3 L 8.6 4.6 L 6.4 3.9" stroke="#548AF7" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M2.6 10.2 H 5.1" stroke="#548AF7" stroke-width="1.7" stroke-linecap="round"/>
+  <path d="M6.9 10.2 H 9.4" stroke="#548AF7" stroke-width="1.7" stroke-linecap="round"/>
+</svg>
