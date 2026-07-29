@@ -7,3 +7,5 @@ out/
 .intellijPlatform/
 
 # Keep the Gradle wrapper jar tracked, ignore everything else transient.
+
+jetbrains_token
