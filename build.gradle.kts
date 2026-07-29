@@ -10,7 +10,7 @@ plugins {
 }
 
 group = "eu.neoralphy"
-version = "0.2.1"
+version = "0.2.2"
 
 repositories {
     mavenCentral()
@@ -88,14 +88,12 @@ intellijPlatform {
     // token, get one at https://plugins.jetbrains.com/author/me/tokens) so it never lives in the
     // repo - do NOT paste a token value here.
     //
-    // Channel "beta" (matching hotpath/callscape's first-upload posture): a non-default channel is
-    // invisible to normal users (installing needs a custom repo URL), and a brand-new plugin is
-    // additionally unlisted until JetBrains approves the first submission. For the real public
-    // launch, drop `channels` (or set it to listOf("")/listOf("default")) so it publishes to the
-    // default channel that ordinary Marketplace search and one-click install use.
+    // Public launch (2026-07-29): default channel, so ordinary Marketplace search and one-click
+    // install work. The plugin listing itself is still separately hidden until "Publish Plugin"
+    // is clicked on the Marketplace vendor page - this only controls which channel uploads land in.
     publishing {
         token = providers.environmentVariable("PUBLISH_TOKEN")
-        channels = listOf("beta")
+        channels = listOf("default")
     }
 }
 

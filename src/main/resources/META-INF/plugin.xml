@@ -59,6 +59,7 @@
 
     <change-notes><![CDATA[
         <ul>
+            <li><b>0.2.2</b> - First stable-channel release. No functional changes from 0.2.1.</li>
             <li><b>0.2.1</b> - A read-modify-write on an undeclared property
                 (<code>$obj->prop += …</code>, <code>$obj->prop++</code>) now offers <b>both</b>
                 <code>__get()</code> and <code>__set()</code> - PHP reads the old value then writes the
