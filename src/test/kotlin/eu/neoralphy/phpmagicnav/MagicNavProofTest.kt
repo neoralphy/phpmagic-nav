@@ -346,4 +346,28 @@ class MagicNavProofTest : BasePlatformTestCase() {
         assertTrue("the property write must not be attributed to __get, got $texts",
             texts.none { it.contains("doThing") })
     }
+
+    /**
+     * Regression test: Find Usages invokes [CustomUsageSearcher.processElementUsages] on a
+     * background pooled thread, never the EDT - calling [reverseUsageTexts] directly from the test
+     * body doesn't catch a missing ReadAction wrap, because the test harness's own thread already
+     * holds read access. Dispatching through [ApplicationManager.executeOnPooledThread] with no
+     * lock held reproduces the real "Read access is allowed from inside read-action only" crash
+     * (any PSI touch - e.g. `Method.name` - before entering `ReadAction.run { }`).
+     */
+    fun testReverseFindUsagesWorksOffEdt() {
+        configure()
+        val method = PsiTreeUtil
+            .findChildrenOfType(myFixture.file, com.jetbrains.php.lang.psi.elements.Method::class.java)
+            .first { it.name == "__toString" && it.containingClass?.name == "Money" }
+        val usages = mutableListOf<com.intellij.usages.Usage>()
+        val processor = com.intellij.util.Processor<com.intellij.usages.Usage> { usages.add(it); true }
+        val options = com.intellij.find.findUsages.FindUsagesOptions(
+            com.intellij.psi.search.GlobalSearchScope.allScope(project),
+        )
+        com.intellij.openapi.application.ApplicationManager.getApplication()
+            .executeOnPooledThread { MagicNavUsageSearcher().processElementUsages(method, processor, options) }
+            .get()
+        assertFalse("expected reverse usages even when searched off the EDT", usages.isEmpty())
+    }
 }

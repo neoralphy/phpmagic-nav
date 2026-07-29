@@ -59,6 +59,12 @@
 
     <change-notes><![CDATA[
         <ul>
+            <li><b>0.2.3</b> - Fixed a crash in reverse Find Usages: searching for usages of a magic
+                method (<code>__toString</code>, <code>__get</code>, etc.) could throw a threading
+                error ("Read access is allowed from inside read-action only") because the method
+                was inspected before the search entered its read-locked section. Find Usages runs
+                this search on a background thread, not the UI thread, so the fix moves that check
+                inside the existing read-locked section instead of before it.</li>
             <li><b>0.2.2</b> - First stable-channel release. No functional changes from 0.2.1.</li>
             <li><b>0.2.1</b> - A read-modify-write on an undeclared property
                 (<code>$obj->prop += …</code>, <code>$obj->prop++</code>) now offers <b>both</b>

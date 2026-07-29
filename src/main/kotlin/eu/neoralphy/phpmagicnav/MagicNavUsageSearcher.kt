@@ -40,12 +40,15 @@ class MagicNavUsageSearcher : CustomUsageSearcher() {
         processor: Processor<in Usage>,
         options: FindUsagesOptions,
     ) {
-        // Cheap gates first: must be a magic *method* declaration, and the feature must be on.
-        val method = element as? Method ?: return
-        val magic = MagicMethod.forMethodName(method.name) ?: return
+        // Cheap gate first: a plain settings read, no PSI access, safe off the read lock.
         if (!MagicNavSettings.getInstance().reverseFindUsagesEnabled()) return
 
         ReadAction.run<RuntimeException> {
+            // Must be a magic *method* declaration - `.name` is PSI access, so it belongs inside
+            // the read action too (this ran unguarded before and threw off the background thread
+            // Find Usages uses to invoke CustomUsageSearcher).
+            val method = element as? Method ?: return@run
+            val magic = MagicMethod.forMethodName(method.name) ?: return@run
             val klass = method.containingClass ?: return@run
             val shortName = klass.name.takeIf { it.isNotEmpty() } ?: return@run
             val project = element.project
